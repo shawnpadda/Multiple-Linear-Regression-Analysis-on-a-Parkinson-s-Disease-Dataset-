@@ -1,0 +1,415 @@
+
+---
+title: "Final Multiple linear Regression Project 2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+# This Project pertains to the mulitple linear regression analysis on a Parkinson's Disease (PD) Dataset to Determine Clinical Relevancy of Telemonitoring Variations of Speech.
+
+```{r}
+# Load the Packages.
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(car)
+library(corrplot)
+library(alr4)
+```
+
+The data set pertains to the range of biomedical voice measurements from 42 people with early-stage Parkinson's disease recruited to a six-month trial of a telemonitoring device for remote symptom progression monitoring. The recordings were automatically captured in the patient's homes.
+
+```{r}
+# Load the data set.
+parkinsons_updrs <- read.csv("//cloud/project/parkinsons_updrs.data", header = TRUE)
+
+# Use a head() function to explore the rows and columns.
+head(parkinsons_updrs)
+
+# Display the dimension of the data set.
+dim(parkinsons_updrs)
+```
+
+```{r}
+# Use a set.seed() function to generate a sequence of random numbers.
+set.seed(888)
+
+# Create a new data frame called park.
+park <- sample_n(parkinsons_updrs, size = 1000, replace = FALSE, weight  = NULL) 
+# Thus sample_n function() is selecting a random sequence of rows by using a Simple Random sampling method from an existing or original data set.
+
+# Use a head() function to extract rows and columns of the new data set.
+head(park)
+
+# Display the dimension of the park.
+#dim(park)
+names(park)
+```
+
+
+```{r}
+# Create an initial model.
+fit0.park <- lm(total_UPDRS ~ 1, data = park )
+
+# Create a full model with all the predictors.
+fit1.park <- lm(total_UPDRS ~ ., data = park)
+
+
+# After removing some unrelated variables such as motor_UPDRS, test_time, and subject. This is our new full model.
+fit2.park <- update(fit1.park, . ~ .-motor_UPDRS- subject.-test_time , data = park)
+summary(fit2.park)
+```
+
+* The summary table describes the output of eighteen potential significant and insignificant predictors in the full model. 
+
+```{r}
+# Round up the coefficients by 2 decimal places.
+round(coef(summary(fit2.park)), 2)
+```
+
+The multiple linear regression equation is as follows:
+
+* $\widehat{total\_UPDRS} = 26.39 + 0.32(age) - 3.11(sex) - 337.15(Jitter...) - 77474.68 (Jitter.Abs.) - 58872.35(Jitter.RAP) - 458.52(Jitter.PPQ5) + 20124.09 (Jitter.DDP) + 58.46(Shimmer) + 1.61 (Shimmer.dB.) - 78770.71(Shimmer.APQ3) + 12.76 (Shimmer.APQ5) - 13.11 (Shimmer.APQ11) + 26181.22(Shimmer.DDA) + 2.57(NHR ) -0.42(HNR) + 7.85(RPDE) - 20.28(DFA) + 25.32(PPE)$.
+
+
+
+
+
+# Run a Global F-test to compare two models.
+
+# Hypothesis Testing:
+
+$H_0: \beta_1 = \beta_2 = \beta_3 = \ ....\ \beta_{18} = 0$
+
+vs
+
+$H_A: \ at \ least \ one \  \beta_j \ne 0, j = 1,2,3,.......,18$
+
+```{r}
+# Comparing a full model with all the predictors to the null model or an initial model.
+anova(fit0.park, fit2.park)
+```
+
+
+* Since the p-value is less than a commonly used $\alpha = 0.001$ value. We reject the $H_0: \beta_1 = \beta_2 = \beta_3 = \ ....\ \beta_{18} = 0$ null hypothesis. It indicates that there is at least one predictor is associated with the total UPDRS.
+
+# Show a marginal relationship between the potential predictors and response.
+```{r}
+# Use a pair() function to show the marginal relationship.
+# Initialize a variable called Pair1 to display the marginal relationship between a response and the predictors.
+Pair1 <- pairs(total_UPDRS ~ age + Jitter... + Jitter.Abs. + 
+    Jitter.RAP + Jitter.PPQ5 + Jitter.DDP + Shimmer + Shimmer.dB., data = park, lower.panel = NULL)
+Pair1
+
+# Initialize a variable called Pair2 to display the marginal relationship between a response and the predictors.
+Pair2 <- pairs(total_UPDRS ~ Shimmer.APQ3 + Shimmer.APQ5 + Shimmer.APQ11 + Shimmer.DDA + 
+    NHR + HNR + RPDE + DFA + PPE, data = park,lower.panel = NULL)
+Pair2
+
+# Use a ggplot() function to display a side-by-side boxplot for the bi-variate/categorical variable.
+ggplot(data = park,aes(sex,total_UPDRS, group = sex)) +
+  geom_boxplot(outlier.shape=NA) +
+  ggtitle("total_UPDRS versus sex") +
+  theme(
+    plot.title = element_text(size=25),
+    axis.title.x = element_text(size = 18),
+    axis.text.x = element_text(size = 17),
+    axis.title.y = element_text(size = 18),
+    axis.text.y = element_text(size = 18))
+```
+* Pair1: In this plot matrix, several predictors indicate a positive linear relationship with a response. However, there are some of the predictors in the data set that Indicate an unknown Relationship. We are not sure about the relationship with those predictors yet.
+
+* Pair2: Several predictors in this plot matrix show a negative linear relationship with a response. Some of the predictors in the data set, specify an unknown Relationship. The relationship between those predictors is still unknown to us.
+
+* Boxplot: The Boxplot visually depicts the distribution of numerical data and skewness. The Boxplot indicates the data looks slightly skewed to the right. The median of males looks marginally Greater than the female gender.
+
+
+```{r}
+# Check Multi-collinearity issue in the data set.
+round(vif(fit2.park), 2)
+
+# Initialize a variable called m that rounds up the correlation by two decimal places.
+m <- round(cor(park),2)
+
+# Construct a Corrplot.
+corrplot(m, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45, tl.cex= 0.7, outline= T)
+
+# Plot a histogram.
+hist(fit2.park$residuals, freq = FALSE)
+lines(density(fit2.park$residuals), col = "red")
+```
+* The variance inflation factors (VIF’s) of several predictors are Greater than five cut-offs except for age, sex, DFA, PPE, and RPDE. It indicates there is a multicollinearity issue among few predictors.
+
+* Positive correlations are shown in blue, while negative correlations are shown in red. The correlation coefficients are proportional to the color intensity and circle size. The legend color on the right side of the correlogram displays the correlation coefficients and their corresponding colors.
+
+* The histogram shows a slightly skewed distribution to the right. It does not seem to be in the form of a bell curve. There is also a disparity in the data collection. As a result, the assumptions are violated.
+# Diagnostic plots 
+
+```{r}
+# Use a par() function to readjust the size of the diagnostic plots.
+par(mfrow = c(2,2), mar = c(2,2,2,2))
+
+# Use a plot() function to display the diagnostic Plots of the Full model.
+plot(fit2.park, which = 1:4)
+
+
+# Construct an Influence index plot.
+influenceIndexPlot(fit2.park, vars = c("hat", "cook"), id = TRUE)
+```
+
+
+* Since the distribution of the response or predictor variable is skewed to the right or positively skewed. The
+scatter plot indicates data skewed to the right in the residuals versus fitted. It indicates the linear model is not
+appropriate. Also, the normal Q-Q plot indicates the data is positively skewed because the tail is above
+the line. As a result, this violates the assumptions of normality and constant variance. Therefore, there are some violations in the data which do not satisfy the assumptions of a
+multiple linear regression model. Thus, the log
+transformation is considered best for the skewed to the right data. We will improve the model by using a appropriate transformation later.
+
+* After looking at the hat-value plot, it's clear that the high leverage points are 444 and 758. We'll look into these issues. The high-influential point, according to the Cook's Distance plot, is 444. We need to look at these data points to determine whether or not they need to be removed.
+
+
+# Influential points
+
+```{r}
+# Set the number of parameters.
+p <- ncol(park)
+
+# Compute the sample size.
+n <- nrow(park)
+
+# Determine the Leverage points.
+park.hat <- hatvalues(fit2.park)
+
+# Compute the sum of the leverage points.
+sum(park.hat)
+
+
+# Determine an Outliers.
+park.out <- rstandard(fit2.park)
+
+# Compute the sum of the outlier points.
+sum(abs(park.out) > 2) # Set threshold 3
+```
+
+There are 19 leverage points and 60 outliers after a thorough investigation of the Influential point candidates. We'll look at these data points and see if they need to be removed later.
+
+# Plot Leverage points and Outliers.
+
+```{r}
+# Create a scatter plot.
+plot(hatvalues(fit2.park), rstandard(fit2.park), xlab = "Leverage", ylab = "Standardized Residuals")
+
+abline(v = 2*(p+1)/n, lty = 2, lwd = 2, col = "red") # Set threshold 2*(p+1)/n
+
+abline(h = c(-2,2), lty = 2, lwd = 2, col = "blue") 
+```
+With the scatterplot of the standardized residuals versus leverage points, we are very Certain about some outliers (unusual y-points) that fall outside the residuals interval (-2,2), and the high leverage points (unusual x-points) follow a cut-off 2*(p+1)/n.
+
+# Variable Selection Technique
+
+* We tested a variety of variable selection methods, including forward selection with AIC and BIC, backward selection with AIC and BIC, subset regression, and stepwise selection (Hybrid). Forward selection with AIC and backward selection with AIC both yielded a final model with 14 predictors that was similar. Following that, the subset regression method generated an eight-predictor final model. However, these eight predictors were unrelated to the research question. We have abandoned this model. So,we needed a final model that could answer our research question with less predictors. We used a new approach called stepwise selection (which began with full model criteria) to generate a final model with ten predictors. Finally, we chose this as our final model because it answers all of our research questions and includes eight biomedical voice measurements to demonstrate the substantial change in response.
+
+```{r}
+# Use a stepwise selection method.
+step(fit2.park, scope = list(lower = fit0.park, upper = fit2.park), trace = 0)
+```
+
+
+# Fit a final model.
+
+```{r}
+# Final model.
+fit3.park<- lm(total_UPDRS ~ age + sex + Jitter.Abs. + Jitter.PPQ5 + 
+    Jitter.DDP + Shimmer.APQ3 + HNR + RPDE + DFA + PPE, data = park)
+summary(fit3.park)
+```
+
+The summary table output indicates all the selected predictors are significant. Since we rejected the $H_0: \beta_1 = \beta_2 = \beta_3 = \ ....\ \beta_{10} = 0$ with p-values less than a commonly used $\alpha \ values \ such \ as \ 0.001, 0.01, 0.05, \ and \ 0.1$.
+
+```{r}
+# Round up the coefficients by 2 decimal places.
+round(coef(summary(fit3.park)), 2)
+```
+
+The multiple linear regression equation is as follows:
+
+* $\widehat{total\_UPDRS} = 27.37 + 0.31(age) - 3.02(sex) - 81387.10 (Jitter.Abs.) - 448.51(Jitter.PPQ5) + 344.27 (Jitter.DDP) - 98.94 (Shimmer.APQ3) -0.45 (HNR) + 8.08 (RPDE) - 20.90 (DFA) + 23.74 (PPE)$.
+
+# Check assumptions.
+
+```{r}
+# Use a plot() function to check the assumptions of a final model.
+plot(fit3.park, which = 1:4)
+```
+
+The Normal Q-Q plot shows that the distribution is slightly positively skewed or skewed to the right after examining the residuals versus fitted values scatterplot. As a result, there are certain inconsistencies in the data that do not meet the assumptions of a multiple linear regression model. 
+
+
+# Transformation of Predictors
+
+```{r}
+# Use a powertransform() function to find out the transform for the predictors.
+ptt <- powerTransform(cbind (age , Jitter.Abs. , Jitter.PPQ5 , 
+    Jitter.DDP , Shimmer.APQ3 , HNR , RPDE , DFA , PPE) ~ 1, park)
+# (sex is a categorical variable).
+
+# Use a summary() function.
+summary(ptt)
+```
+
+* We first looked at the likelihood ratio test, lambda = (0 0 0 0 0 0 0 0 0), we rejected the null hypothesis with p-value less than a commonly used $\alpha = 0.05$ value. Second, we looked at the likelihood ratio test, lambda = (1 1 1 1 1 1 1 1 1), we rejected the null hypothesis with p-value less than a commonly used $\alpha = 0.05$ value. Following that, for each predictor, we used a case-by-case transformation. Except for RPDE, the power transform function indicated a log transformation for other predictors. For RPDE, the power transform recommended no transformation. Lastly, a square root transformation for age was also suggested by the power transform function.
+
+
+```{r}
+# Transforming the predictors of the final model.
+fit4.park <- lm(total_UPDRS ~ (age^2) +sex + log(Jitter.Abs.)+log(Jitter.PPQ5)+
+   log(Jitter.DDP)+ log(Shimmer.APQ3) + (HNR^2)+ RPDE + log(DFA) +log( PPE ) , data = park)
+
+# Use a boxCox() function to verify the transformation.
+boxCox(fit4.park, lambda = seq(-2,2,0.5))
+
+# Identifying the transformation for response.
+summary(powerTransform(fit4.park))
+```
+
+* With the likelihood ratio test, lambda = (0), the null hypothesis rejected with a p-value less than a commonly used $alpha value = 0.05$. Second, using the likelihood ratio test (lambda = 1), we rejected the null hypothesis with a p-value less than the commonly used $alpha = 0.05$ value. Lastly, a square root transformation for a response was recommended by the power transform function.
+
+* For a response, the BoxCox method suggested using a square root transformation. The optimal lambda hat value is somewhere between 0.5 and 1, but it's probably about 0.5. The square root transformation is what we choose to use.
+
+
+# Transformation model.
+```{r}
+# Refit a model.
+fit5.park <- lm(sqrt(total_UPDRS) ~ age + I(age^2) + sex + log(Jitter.Abs.) + log(Jitter.PPQ5) + log(Jitter.DDP)+ log(Shimmer.APQ3) + HNR + I(HNR^2)+ RPDE + log(DFA) + log( PPE ) , data = park)
+
+round(coef(summary(fit5.park)),4)
+```
+
+The multiple linear regression equation is;
+
+ $\widehat{sqrt(total\_UPDRS)} = -3.3269  + 0.0598 (age) -0.0002(age^2) -0.3709 (sex) -0.6696 \log\ (Jitter.Abs.) +  0.6660 \log\ (Jitter.PPQ5) + 0.0707 \log\ (Jitter.DDP) -0.4531 \log\ (Shimmer.APQ3) + 0.1027 (HNR) + -0.0044(HNR^2) + 1.4974  (RPDE) - 1.4069 \log\ (DFA) +  0.1073 \log\ (PPE)$.
+
+
+
+```{r}
+# Set the margin.
+par(mfrow = c(2,2), mar = c(3,3,3,3))
+
+# Plots before transformation.
+plot(fit3.park, which = 1:4)
+
+# Plots after transformation.
+plot(fit5.park, which = 1:4)
+```
+# Findings before transformation:
+
+The residuals versus Fitted value plot demonstrates an Obvious skewness in the data. The red line e(residuals) = 0 is also not very close to the horizontal line, and the data is not randomly scattered around 0. Consequently, the constant variance assumption is unsatisfied. The tail is above the line in the Normal Q-Q plot of the Standardized residuals indicates that the data skewed to the right. It also works against the normality assumption. Similarly, Cook's Distance plot shows that 444 is the Influential point with a value greater than 0.5. We must analyze this data point to determine whether it is necessary to eliminate it or not.
+
+# Findings after transformation:
+
+The plots of residuals versus fitted values and the Normal Q-Q Plot are much improved after applying a square root transformation to the response and a log transformation to the predictors. The points tend to be strewn randomly around 0, with no Obvious patterns or non-constant variance. As a result, the constant variance and normality assumptions are reasonably met. The red line e(residuals) = 0 is very close to the horizontal line. Besides, the standardized residuals' Normal Q-Q plot has significantly improved. It seems to be perfectly normal. Most of the data points follow a straight line. Finally, Cook's distance does not indicate any Influential point greater than 0.5. As a result, the transformed model appears to be a good fit for the results. As a result, the required transformation suits the final model reasonably well.
+
+# Scatterplot Matrix
+
+
+```{r}
+# Use a scatterplot matrix() function.
+Scatter1 <- scatterplotMatrix(~ sqrt(total_UPDRS) + age + I(age^2) +log(Jitter.Abs.)+log(Jitter.PPQ5)+ log(Jitter.DDP), data = park, smooth = FALSE, pch = 19,lower.panel = NULL, col = "#E7B800", main = "Scatterplot Matrix")
+Scatter1
+# Without sex variable. 
+
+# Use a scatterplot matrix () function.
+Scatter2 <- scatterplotMatrix(~ sqrt(total_UPDRS) + log(Shimmer.APQ3) + HNR +I(HNR^2)+ RPDE + log(DFA) +log( PPE ) , data = park, smooth = FALSE,pch =19, lower.panel = NULL, col = "#00AFBB", main = "Scatterplot Matrix")
+Scatter2
+```
+# Findings:
+
+ * Scatter1: 
+ 
+The scatterplot matrix indicates a marginal relationship between the potential predictors and response after transformation. As we can see, several predictors have positive linear relationships. Most of the predictors look Normally distributed after the required Transformation. 
+
+* Scatter2: 
+
+The scatterplot matrix indicates a marginal relationship between the potential predictors and response after transformation. As we can see, several predictors have negative and positive linear relationships. Most of them look Normally distributed after the required transformation. 
+
+# Confidence interval
+
+```{r}
+# Rounding up by 4 decimal place.
+round(confint(fit5.park),4)
+```
+
+* Since the point estimates lie between the lower and upper bounds, the 95 percent confidence interval shows how Small or Large the difference is. The majority of them indicate $0 \notin 95 \% C.I$ after log transformation. We've ruled out the null hypothesis. As a consequence, the outcome is considered statistically significant. Now, we are confident that these possible predictors can be used to monitor PD symptoms.
+
+# Compute R^2 (Coefficient of determination) and adjusted R^2.
+```{r}
+# Comparison
+c(summary(fit3.park)$r.squared,summary(fit3.park)$adj.r.squared)
+c(summary(fit5.park)$r.squared,summary(fit5.park)$adj.r.squared)
+```
+
+* After choosing ten predictors instead of eighteen predictors and applying the requisite transformation, the R2 and adj-R2 values increased. As a consequence, we can deduce that a model with a higher adjusted R2 value is preferable.
+
+
+# Addressing a second question.
+
+```{r}
+# Interaction between HNR and sex.
+
+Int1.park <- lm(sqrt(total_UPDRS) ~ age + I(age^2) +sex + log(Jitter.Abs.)+log(Jitter.PPQ5)+ log(Jitter.DDP)+ log(Shimmer.APQ3) + HNR + I(HNR^2)+ RPDE + log(DFA) +log( PPE ) + HNR * sex + I(HNR^2) * sex , data = park)
+
+anova(fit5.park,Int1.park)
+```
+
+The summary table output indicates that the interaction terms are significant. It means we reject the null hypothesis. We need the interaction terms between HNR * sex and HNR^2 * sex. Besides, the HNR (Harmonic-to-noise ratio) relates to the noise in a voice signal of both genders. The HNR values directly influence the voice quality of both genders. Thus, the interaction term indicates the Result is Certain about the impact of change in HNR values on both genders.
+
+
+
+
+```{r}
+# Final after transformation
+round(coef(Int1.park), 4)
+```
+
+
+$\widehat{sqrt(total\_UPDRS)} = -3.9607  + 0.0554\ (age) -0.0002\ (age^2) + 0.2162\ (sex) -0.7033 \log\ (Jitter.Abs.) + 0.5813 \log\ (Jitter.PPQ5) + 0.1533 \log\ (Jitter.DDP) - 0.4264 \log\ (Shimmer.APQ3) + 0.1350 (HNR) - 0.0046(HNR^2) + 1.5522\ (RPDE) - 1.1543 \log\ (DFA) + 0.1167 \log\ (PPE) - 0.0098\ (HNR*sex) - 0.0008\ (HNR^2*sex)$.
+
+
+
+
+# Addressing a third question.
+
+```{r}
+# Interaction between PPE and sex.
+Int2.park <- lm(sqrt(total_UPDRS) ~ age + I(age^2) +sex + log(Jitter.Abs.)+log(Jitter.PPQ5)+ log(Jitter.DDP)+ log(Shimmer.APQ3) + HNR + I(HNR^2)+ RPDE + log(DFA) + log( PPE ) + log(PPE) * sex , data = park)
+
+# Use an anova() function to compare two models.
+anova(fit5.park, Int2.park)
+```
+
+
+* Since the p-value is greater than a commonly used $\alpha = 0.05$ value. We failed to reject the $H_0: without \ \ interaction$. We will prefer model 1 without interaction in the next step. 
+
+```{r}
+# Round up coefficients by 4 decimal place.
+round(coef(fit5.park),4)
+```
+
+The multiple linear regression equation is as follows:
+
+* $\widehat {sqrt\ (total\_UPDRS)} = -3.3269 + 0.0598\ (age) -0.0002\ (age^2) -0.3709\ (sex) - 0.6696 \ log\ (Jitter.Abs.) +  0.6660\ log\ (Jitter.PPQ5) + 0.0707\ log\ (Jitter.DDP) -0.4531\ log\ (Shimmer.APQ3) + 0.1027\ (HNR) -0.0044\ (HNR^2) + 1.4974 (RPDE) - 1.4069 \ log\ (DFA) + 0.1073\ log\ (PPE)$.
+
+# Findings
+
+An interaction term is considered statistically insignificant in the summary table. It indicates that we were unable to dismiss the null hypothesis. We don’t need an interaction term between PPE and sex. Furthermore, since PPE tests fundamental frequency, males have a lower fundamental frequency than females and so on females have a lower fundamental frequency than child. Using an interaction effect between PPE and sex would also be impossible.There may be some confounding factors such as air expelled out of the lungs in the speech signal that cause PPE to rise. Hoarseness is accompanied by a rise in PPE, which is associated with dysphonia. Finally, our research shows that changes in PPE and gender may have a direct or indirect impact on the total UPDRS. Thus, the severity of the Parkinson's disease symptoms is measured by an increase in the total UPDRS.
+
+
+
+
+
+
+
+
+
